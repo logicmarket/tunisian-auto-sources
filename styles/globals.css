@@ -1,0 +1,273 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-sans text-foreground antialiased;
+    background-image:
+      radial-gradient(48rem 32rem at 50% -12%, rgba(245, 158, 11, 0.11), transparent 70%),
+      radial-gradient(42rem 30rem at 96% 2%, rgba(36, 58, 84, 0.34), transparent 72%);
+    background-repeat: no-repeat;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    @apply bg-accent text-background;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-background;
+  }
+
+  ::placeholder {
+    @apply text-muted/70;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2a2f3a transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-line;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary-500;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-page px-4 sm:px-6 lg:px-8;
+  }
+
+  .surface-card {
+    @apply rounded-2xl border border-line bg-surface/90 shadow-card;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-raised px-2.5 py-1 text-[11px] font-semibold text-muted-strong;
+  }
+
+  .skip-link {
+    @apply fixed right-4 top-4 z-[100] -translate-y-24 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-background transition-transform duration-200 focus:translate-y-0;
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-l from-accent-300 via-accent-400 to-accent-500 bg-clip-text text-transparent;
+  }
+
+  .hero-grid {
+    background-image:
+      linear-gradient(to left, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 3.5rem 3.5rem;
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000 15%, transparent 72%);
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 0%, #000 15%, transparent 72%);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Phase 4: keep long Arabic labels and dense tables inside the viewport. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.surface-card,
+.chip {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  /* iOS zooms the page when a focused control is under 16px. */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ───────────────────────── Print / poster ───────────────────────── */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #111111 !important;
+  }
+
+  header,
+  footer,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+
+  main,
+  section,
+  article,
+  aside {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .container-page {
+    max-width: none;
+    padding: 0;
+  }
+
+  main *,
+  .surface-card,
+  .chip {
+    color: #111111 !important;
+    border-color: #b5b5b5 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  main > *:not(.print-poster-wrap) {
+    display: none !important;
+  }
+
+  .print-poster-wrap {
+    display: block !important;
+  }
+
+  .print-poster {
+    border: 2px solid #111111 !important;
+    padding: 18px !important;
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    color: #111111 !important;
+    background: #ffffff !important;
+  }
+
+  .print-poster * {
+    color: #111111 !important;
+    border-color: #111111 !important;
+    background: transparent !important;
+  }
+
+  a[href]::after {
+    content: "";
+  }
+
+  /* Phase 4: the dashboard prints only the light comparison sheet. */
+  .dashboard-page > *:not(.dashboard-content) {
+    display: none !important;
+  }
+
+  .dashboard-page > .dashboard-content {
+    display: block !important;
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .dashboard-shell > *:not(.print-comparison-wrap) {
+    display: none !important;
+  }
+
+  .print-comparison-wrap {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    z-index: auto !important;
+    pointer-events: auto !important;
+  }
+
+  .pdf-sheet {
+    width: 100% !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .pdf-sheet table {
+    page-break-inside: auto;
+  }
+
+  .pdf-sheet tr {
+    page-break-inside: avoid;
+  }
+}

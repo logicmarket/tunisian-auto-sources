@@ -1,0 +1,65 @@
+{
+  "name": "tunisian-automotive-sources-portal",
+  "version": "1.1.0",
+  "private": true,
+  "description": "بوابة مصادر السيارات التونسية — Next.js 14 · Prisma · Neon PostgreSQL",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "predev": "prisma generate",
+    "dev": "next dev",
+    "prebuild": "prisma generate",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio",
+    "db:setup": "prisma migrate deploy && tsx scripts/setup-db.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:migrate:sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
+    "db:verify": "tsx scripts/migrate-sqlite-to-postgres.ts --verify-only",
+    "check-links": "tsx scripts/check-links.ts",
+    "check-links:write": "tsx scripts/check-links.ts --write",
+    "check-links:strict": "tsx scripts/check-links.ts --write --fail-on-dead",
+    "check-links:sample": "tsx scripts/check-links.ts --limit=20",
+    "verify:phase4": "node scripts/verify-phase4.cjs",
+    "verify:migration": "node scripts/test-phase4-migration.cjs",
+    "verify:mobile": "node scripts/verify-mobile.mjs"
+  },
+  "prisma": {
+    "seed": "tsx scripts/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.1",
+    "@sentry/nextjs": "^11.14.0",
+    "@vercel/analytics": "^2.0.1",
+    "html2pdf.js": "^0.14.0",
+    "lucide-react": "^1.72.0",
+    "minisearch": "^7.2.0",
+    "next": "14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "autoprefixer": "^10.4.20",
+    "better-sqlite3": "^12.11.1",
+    "dotenv": "^16.4.7",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.35",
+    "postcss": "^8.4.49",
+    "prisma": "^6.2.1",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

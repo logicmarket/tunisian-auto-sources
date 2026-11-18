@@ -1,0 +1,290 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// File: prisma/schema.prisma
+// Phase 5 · Task 1 — SQLite → PostgreSQL (Neon) migration
+//
+// Design notes
+// • Field names intentionally keep the existing snake_case names. This keeps
+//   raw SQL, exports and the existing TypeScript record types (`lib/types.ts`)
+//   byte-compatible and avoids a risky rename across the whole UI.
+// • `@@map` pins every table to the lowercase table names used by the SQLite
+//   database, so `scripts/migrate-sqlite-to-postgres.ts` can copy rows 1:1.
+// • Timestamps use `timestamptz(6)` (UTC) instead of SQLite's untyped TEXT.
+//   `lib/mappers.ts` converts them back to ISO strings for the UI.
+// • `last_verified` stays TEXT because it is a calendar date ("2026-11-12"),
+//   not an instant. Changing it to DateTime would shift dates across time
+//   zones and break the existing Arabic date formatting.
+// • `helpful` stays a nullable 0/1 INTEGER because the Phase 4 API and widget
+//   already speak in `0 | 1 | null`. See Rating.helpful below.
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Pooled Neon connection string (…-pooler.…neon.tech) used by the app.
+  url       = env("DATABASE_URL")
+  // Unpooled/direct connection used by `prisma migrate` and the SQLite import
+  // script. On Neon: remove "-pooler" from the host. When you do not use a
+  // pooler (local Postgres, Supabase direct), set DIRECT_URL = DATABASE_URL.
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// sources — curated catalogue (141 rows in the Phase 0 dataset)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Source {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.Text
+  url             String   @unique @db.Text
+  description_ar  String   @db.Text
+  description_fr  String?  @db.Text
+  category_system String   @db.Text
+  category_task   String   @db.Text
+  language        String   @db.Text
+  link_status     String   @default("UNVERIFIED") @db.Text
+  /// Calendar date only (YYYY-MM-DD). Intentionally TEXT, see header note.
+  last_verified   String?  @db.Text
+  rating          Float    @default(0)
+  notes           String?  @db.Text
+  /// Stable URL slug added in Phase 4. NULL is allowed and unique.
+  slug            String?  @unique @db.Text
+  /// Origin submission id. No FK on purpose: submissions.published_source_id
+  /// already links the other way, and older SQLite rows predate submissions.
+  submission_id   Int?
+  /// Phase 5 · Task 3 — hidden sources stay in the database but are excluded
+  /// from every public listing, search, sitemap and diagnosis result.
+  is_hidden       Boolean  @default(false)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  ratings         Rating[]
+  source_feedback SourceFeedback[]
+  published_from  Submission[]     @relation("PublishedSource")
+  link_reports    LinkReport[]
+
+  @@index([is_hidden])
+  @@index([category_system])
+  @@index([category_task])
+  @@index([language])
+  @@index([link_status])
+  @@index([rating(sort: Desc)])
+  @@index([created_at(sort: Desc)])
+  @@index([submission_id])
+  @@map("sources")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// obd_codes — Phase 3 diagnostic catalogue (442 rows)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ObdCode {
+  id              Int     @id @default(autoincrement())
+  code            String  @unique @db.Text
+  category        String  @db.Text
+  system_category String? @db.Text
+  related_system  String? @db.Text
+  name_ar         String? @db.Text
+  name_en         String? @db.Text
+  description     String? @db.Text
+  causes          String? @db.Text
+  diagnosis_steps String? @db.Text
+  severity        String? @default("Medium") @db.Text
+  verification    String? @default("VERIFIED") @db.Text
+  source_note     String? @db.Text
+  family          String? @db.Text
+
+  symptom_mappings SymptomMapping[]
+
+  @@index([category])
+  @@index([system_category])
+  @@index([family])
+  @@index([severity])
+  @@index([verification])
+  @@map("obd_codes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// symptoms — Phase 4 guided diagnosis (38 rows)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Symptom {
+  id              String @id
+  name_ar         String @db.Text
+  name_en         String @db.Text
+  system_category String @db.Text
+  sort_order      Int    @default(0)
+
+  mappings SymptomMapping[]
+
+  @@index([system_category, sort_order])
+  @@map("symptoms")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// symptom_mapping — conservative symptom → code links (116 rows)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SymptomMapping {
+  id            Int     @id @default(autoincrement())
+  symptom_id    String
+  obd_code      String  @db.Text
+  /// high | medium | low (enforced by lib/phase4/validation + the old CHECK).
+  confidence    String  @db.Text
+  /// JSON-encoded string array, e.g. ["Toyota","Peugeot"].
+  common_brands String  @default("[]") @db.Text
+  priority_rank Int     @default(0)
+  rationale_ar  String? @db.Text
+  verification  String  @default("APPROXIMATE") @db.Text
+
+  symptom Symptom @relation(fields: [symptom_id], references: [id], onDelete: Cascade)
+  obd     ObdCode @relation(fields: [obd_code], references: [code], onDelete: Cascade)
+
+  @@unique([symptom_id, obd_code])
+  @@index([symptom_id, priority_rank])
+  @@index([obd_code])
+  @@index([confidence])
+  @@map("symptom_mapping")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ratings — Phase 4 hardened community ratings
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Rating {
+  id          Int      @id @default(autoincrement())
+  source_id   Int
+  visitor_id  String   @db.Text
+  stars       Int
+  comment     String?  @db.Text
+  /// 1 = helpful, 0 = not helpful, NULL = not answered.
+  helpful     Int?
+  flagged     Int      @default(0)
+  flag_reason String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  source Source @relation(fields: [source_id], references: [id], onDelete: Cascade)
+
+  @@unique([source_id, visitor_id])
+  @@index([source_id, stars])
+  @@index([visitor_id])
+  @@index([flagged])
+  @@map("ratings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// submissions — community suggestions + admin review
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Submission {
+  id                  Int       @id @default(autoincrement())
+  url                 String    @db.Text
+  normalized_url      String    @db.Text
+  name                String    @db.Text
+  description_ar      String    @db.Text
+  suggested_system    String    @db.Text
+  suggested_task      String    @db.Text
+  reason              String?   @db.Text
+  email               String?   @db.Text
+  /// pending | approved | rejected
+  status              String    @default("pending") @db.Text
+  reviewer_note       String?   @db.Text
+  status_token        String    @unique @db.Text
+  recaptcha_score     Float?
+  /// JSON-encoded string array of detector flags.
+  spam_flags          String?   @db.Text
+  ip_address          String?   @db.Text
+  published_source_id Int?
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  reviewed_at         DateTime? @db.Timestamptz(6)
+
+  published_source Source? @relation("PublishedSource", fields: [published_source_id], references: [id], onDelete: SetNull)
+
+  @@index([status, created_at(sort: Desc)])
+  @@index([normalized_url])
+  @@index([ip_address, created_at])
+  @@index([published_source_id])
+  @@map("submissions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// source_feedback — lightweight star / helpful votes (pre-Phase-4 widget)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SourceFeedback {
+  id         Int      @id @default(autoincrement())
+  source_id  Int
+  /// rating | helpful
+  kind       String   @db.Text
+  value      Int
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  source Source @relation(fields: [source_id], references: [id], onDelete: Cascade)
+
+  @@index([source_id, kind])
+  @@map("source_feedback")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// contact_messages — About page contact form
+// ─────────────────────────────────────────────────────────────────────────────
+
+model ContactMessage {
+  id         Int      @id @default(autoincrement())
+  name       String?  @db.Text
+  email      String?  @db.Text
+  topic      String   @db.Text
+  message    String   @db.Text
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)])
+  @@map("contact_messages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifications — durable outbox for submitter emails
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id         Int       @id @default(autoincrement())
+  channel    String    @default("email") @db.Text
+  recipient  String    @db.Text
+  subject    String    @db.Text
+  body       String    @db.Text
+  /// queued | sent | failed
+  status     String    @default("queued") @db.Text
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  sent_at    DateTime? @db.Timestamptz(6)
+
+  @@index([status, created_at])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// link_reports — Phase 5 · Task 3 health-check history (one row per check)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model LinkReport {
+  id          Int      @id @default(autoincrement())
+  source_id   Int
+  /// Snapshot of the URL at check time (audit trail — sources.url may change).
+  url         String   @db.Text
+  status_code Int?
+  final_url   String?  @db.Text
+  /// LIVE | REDIRECT | UNKNOWN | DEAD | UNVERIFIED
+  link_status String   @db.Text
+  /// Network/timeout error, truncated to 500 chars.
+  error       String?  @db.Text
+  duration_ms Int?
+  checked_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  source Source @relation(fields: [source_id], references: [id], onDelete: Cascade)
+
+  @@index([source_id, checked_at(sort: Desc)])
+  @@index([link_status, checked_at(sort: Desc)])
+  @@index([checked_at(sort: Desc)])
+  @@map("link_reports")
+}

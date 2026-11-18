@@ -1,0 +1,86 @@
+name: Link health
+
+# Nightly external-link sweep. Read/write access is limited to the database via
+# secrets; the workflow never pushes to main and never commits report files.
+on:
+  schedule:
+    # 03:15 UTC — 15 minutes after the Vercel cron, so both paths are covered
+    # even if one platform skips a run.
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Maximum number of links to check"
+        required: false
+        default: "500"
+      concurrency:
+        description: "Parallel requests (1-16)"
+        required: false
+        default: "6"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: link-health
+  cancel-in-progress: false
+
+jobs:
+  check-links:
+    name: Check external source URLs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL || secrets.DATABASE_URL }}
+      NODE_OPTIONS: "--max-old-space-size=4096"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Verify database schema
+        run: npx prisma migrate status
+
+      - name: Run link checker (write mode)
+        run: |
+          npm run check-links:write -- \
+            --limit="${{ github.event.inputs.limit || '500' }}" \
+            --concurrency="${{ github.event.inputs.concurrency || '6' }}" \
+            --report="reports/link-health/github-run.json"
+
+      - name: Database summary
+        if: always()
+        run: |
+          psql "$DIRECT_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT link_status, COUNT(*) AS sources
+            FROM sources
+           GROUP BY link_status
+           ORDER BY sources DESC;
+
+          SELECT COUNT(*) AS checked_last_24h
+            FROM link_reports
+           WHERE checked_at > NOW() - INTERVAL '24 hours';
+          SQL
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-health-report
+          path: reports/link-health/
+          if-no-files-found: warn
+          retention-days: 30
