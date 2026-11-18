@@ -1,0 +1,43 @@
+{
+  "inputs": [
+    {
+      "id": "github-token",
+      "type": "promptString",
+      "description": "GitHub Personal Access Token (classic) with repo + workflow scopes",
+      "password": true
+    },
+    {
+      "id": "database-url",
+      "type": "promptString",
+      "description": "Neon PostgreSQL pooled connection string (read-only role recommended)",
+      "password": true
+    }
+  ],
+  "servers": {
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github-token}"
+      }
+    },
+    "neon": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "mcp-server-neon"],
+      "env": {
+        "DATABASE_URL": "${input:database-url}"
+      }
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}"
+      ]
+    }
+  }
+}

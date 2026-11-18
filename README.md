@@ -132,6 +132,7 @@ reports/             Link-health report template + generated reports
 | [`docs/SEO-PERFORMANCE.md`](docs/SEO-PERFORMANCE.md) | SEO والأداء |
 | [`docs/MIGRATION-GUIDE.md`](docs/MIGRATION-GUIDE.md) | ترحيل SQLite → PostgreSQL |
 | [`docs/branching.md`](docs/branching.md) | استراتيجية الفروع |
+| [`docs/mcp-setup.md`](docs/mcp-setup.md) | إعداد خوادم MCP |
 | [`docs/growth-plan.md`](docs/growth-plan.md) | خطة النمو |
 | [`CHANGELOG.md`](CHANGELOG.md) | سجل التغييرات |
 
